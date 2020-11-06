@@ -32,6 +32,7 @@ void UsbScanner::scan() {
   scanReport();
   usbHost.Task();
   usbStateUpdate();
+  delay(10);
 }
 
 void UsbScanner::usbStateUpdate() {

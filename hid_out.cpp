@@ -3,24 +3,18 @@
 Adafruit_USBD_HID usbhid;
 BLEDis bledis;
 BLEHidAdafruit blehid;
-static int deviceIndex = 0;
-static uint16_t devices[3] = {9, 9, 9};
 
 uint8_t const desc_hid_report[] = {
   TUD_HID_REPORT_DESC_KEYBOARD(),
 };
 
 static void bleConnectCallback(uint16_t conn_handle) {
-  devices[deviceIndex] = conn_handle;
-  
-  // Get the reference to current connection
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   char deviceName[32] = { 0 };
   connection->getPeerName(deviceName, sizeof(deviceName));
   ble_gap_addr_t addr = connection->getPeerAddr();
+  
   LOG("Connected [");
-  LOG(conn_handle);
-  LOG("] to [");
   LOG(deviceName);
   LOG("] with addr: ");
   LOG(addr.addr[0], HEX);
@@ -41,7 +35,9 @@ static void bleDisconnectCallback(uint16_t conn_handle, uint8_t reason) {
   (void) conn_handle;
   (void) reason;
 
-  devices[deviceIndex] = 9;
+  LOG("Disconnected [");
+  LOG(conn_handle);
+  LOG("]\r\n");
 }
 
 void HidOut::begin() {
@@ -54,9 +50,13 @@ void HidOut::begin() {
   usbhid.begin();
 
   LOG("Begin BLE HID\r\n");
-  Bluefruit.begin(MAX_DEVICE_CONNECT, 0);
+  Bluefruit.configPrphBandwidth(BANDWIDTH_HIGH);
+  Bluefruit.begin(1, 0);
   Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
   Bluefruit.setName(BLE_NAME);
+  Bluefruit.autoConnLed(true);
+  Bluefruit.setConnLedInterval(1000);
+  Bluefruit.Periph.setConnInterval(6, 12);
   Bluefruit.Periph.setConnectCallback(bleConnectCallback);
   Bluefruit.Periph.setDisconnectCallback(bleDisconnectCallback);
 
@@ -87,12 +87,14 @@ void HidOut::begin() {
    * For recommended advertising interval
    * https://developer.apple.com/library/content/qa/qa1931/_index.html   
    */
-  Bluefruit.Advertising.restartOnDisconnect(false);
-  Bluefruit.Advertising.setInterval(32, 244);    // in units of 0.625 ms
+  Bluefruit.Advertising.restartOnDisconnect(true);
+  Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
+  Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds
 
   bond_print_list(BLE_GAP_ROLE_PERIPH);
-  Bluefruit.clearBonds();
+  // Bluefruit.clearBonds();
+  // startAdv();
 }
 
 void HidOut::sendKeys(UsbReport usbReport) {
@@ -102,48 +104,10 @@ void HidOut::sendKeys(UsbReport usbReport) {
       LOG("Send keys via USB\n\r");
       usbhid.keyboardReport(0, usbReport.mods, usbReport.keys);
     }
-    if (useBle && !Bluefruit.Advertising.isRunning() && devices[deviceIndex] != 9) {
+    if (useBle && !Bluefruit.Advertising.isRunning()) {
       LOG("Send keys via BLE\n\r");
-      blehid.keyboardReport(devices[deviceIndex], usbReport.mods, usbReport.keys);
+      blehid.keyboardReport(0, usbReport.mods, usbReport.keys);
     }
   } else {
-    if (fn == Fn::DV0) {
-      switchDevice(0);
-    } else if (fn == Fn::DV1) {
-      switchDevice(1);
-    } else if (fn == Fn::DV2) {
-      switchDevice(2);
-    } else if (fn == Fn::BLE_TG) {
-      useBle = !useBle;
-      if (!useBle) {
-        stopAdv();
-      }
-    } else if (fn == Fn::USB_TG) {
-      useUsb = !useUsb;
-    }
-  }
-}
-
-void HidOut::switchDevice(int _index) {
-  if (!useBle) {
-    return;
-  }
-  deviceIndex = _index;
-  if (devices[deviceIndex] == 9) {
-    startAdv();
-  } else {
-    stopAdv();
-  }
-}
-
-void HidOut::startAdv() {
-  if (useBle && !Bluefruit.Advertising.isRunning()) {
-    Bluefruit.Advertising.start(ADV_TIMEOUT);      // Stop advertising entirely after ADV_TIMEOUT seconds
-  }
-}
-
-void HidOut::stopAdv() {
-  if (Bluefruit.Advertising.isRunning()) {
-    Bluefruit.Advertising.stop();
   }
 }

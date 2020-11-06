@@ -18,10 +18,6 @@ class HidOut {
     Tranfer tranfer;
     bool useUsb;
     bool useBle;
-    uint16_t currentDevice;
-    void switchDevice(int _index);
-    void startAdv();
-    void stopAdv();
 };
 
 #endif /* HID_OUT_H */

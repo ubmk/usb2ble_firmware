@@ -5,17 +5,12 @@
 #include "usb_report_parser.h"
 
 enum class Fn: int {
-  None = 0,
-  DV0 = 1,
-  DV1 = 2,
-  DV2 = 3,
-  BLE_TG = 20,
-  USB_TG = 31
+  Waiting = -1,
+  None = 0
 };
 
 class Tranfer {
   public:
-    void begin();
     Fn getFn(UsbReport usbReport);
 };
 
